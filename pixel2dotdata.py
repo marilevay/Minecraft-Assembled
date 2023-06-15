@@ -46,7 +46,7 @@ for i in range(h):
     for pixel in pixelstring:
         ans.append(conversion[pixel])
 print()
-print('file: .word', str(w) + ', ' + str(h))
+print('test: .word', str(w) + ', ' + str(h))
 print('.byte')
 for i in range(len(ans)):
     data= ans[i]
