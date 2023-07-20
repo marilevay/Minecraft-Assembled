@@ -1,57 +1,132 @@
 .data
 .include "game.data"
-.include "main_transparent.data"
-.include "zumbi_transparent.data"
-.include "enderman_transparent.data"
-.include "creeper_transparent.data"
-.include "tile.data"
-Map: .word 0x38383838
+.include "phases.data"
+.include "../Sprites/main_transparent.data"
+.include "../Sprites/enderman_transparent.data"
+.include "../Sprites/zumbi_transparent.data"
+.include "../Sprites/creeper_transparent.data"
+
 .text
 
 # MAIN -> SETUP
-# -> GAME
+# -> GAME -> subroutines
+#Registers level: t: subroutines, s: routines, a: routines
 
 #função principal do jogo: controlar o andamento das fases
-MAIN:	li s0, 0xFF000000 #endereço do frame 0
-	li s1, 0xFF100000 #endereço do frame 1
-	li s2, 0xFF200604 #endereço da escolha de frame
-	li s3, 0xFF200000 #endereço do teclado
-	la s4, matrix #matriz com as informações do mapa
-	la s5, char #endereço das informações do personagem
-	la s6, enemies #endereço das informações dos inimigos
-	la s7, shots #endereço das informações dos tiros
-	#s8 : endereço de retorno para procedimentos com múltiplas chamadas
-	li a0, 1 #fase
+MAIN:	# 0xFF000000 #endereço do frame 0
+	# 0xFF100000 #endereço do frame 1
+	# 0xFF200604 #endereço da escolha de frame
+	# 0xFF200000 #endereço do teclado
+	#s11 : endereço de retorno para procedimentos com múltiplas chamadas
+	li a0, 0 #fase
 	call SETUP #seta a fase para jogo
 	call GAME #jogo
 	li a7, 10
 	ecall #fim
 
 #função de configuração das fases e do menu do jogador	
-SETUP:	#a0 = fase atual
-	mv s8, ra #s8 = return to MAIN
-	li a0, 0
-	call DMAP #desenha o mapa correspondente nos dois frames
-	li a0, 1
-	call DMAP
-	jalr zero, s8, 0
+#a0 = fase atual (0-2); s11: ra
+#seta o endereço "tile" para a imagem do tile correspondente à fase
+SETUP:	#s8 = iterador da matriz da fase; s9 = iterador da matriz principal; s10 = endereço da imagem do tile
+	#a4 = iterador de posição; a5 = 400 (posição final)
+	mv s11, ra #s8 = return to MAIN
+	la s0, phase
+	li t0, 400
+	mul t0, t0, a0
+	add s0, s0, t0 #informações da fase atual
+	la s1, matrix
+ 	li s2, 0
+ 	li s3, 400
+LSETUP:	beq s2, s3, ESETUP
+	lb t0, 0(s0)
+	sb t0, 0(s1)
+SC0:	li t1, 0
+	bne t0, t1, SC1
+	la s4, ground
+	j DSETUP
+SC1:	li t1, 3
+	bne t0, t1, SC2
+	la s4, key
+	j DSETUP
+SC2:	li t1, 4
+	bne t0, t1, SC3
+	la s4, door
+	j DSETUP
+SC3:	li t1, 5
+	bne t0, t1, SC4
+	la s4, wall
+	j DSETUP
+SC4:	la s4, portal
+
+DSETUP:	li t0, 144
+	mul t0, t0, a0
+	addi t0, t0, 8 #incremento para endereços dessa fase
+	mv s5, a0
+	la a0, ground
+	add a0, a0, t0 #cobertura de tile por baixo do elemento
+	add s4, s4, t0 #endereço deste elemento
+	
+	li t0, 20
+	rem a1, s2, t0 #x = pos%20
+	div a2, s2, t0 #y = pos/20
+	li t0, 12
+	mul a1, a1, t0
+	mul a2, a2, t0 #posições base 12
+	
+	li a3, 0
+	call DRAW
+	li a3, 1
+	call DRAW #desenha ocbertura de tile
+	mv a0, s4
+	li a3, 0
+	call DRAW
+	li a3, 1
+	call DRAW #desenha elemento da posição
+	mv a0, s5 #reseta a0 para valor da fase
+	
+	addi s0, s0, 1
+	addi s1, s1, 1
+	addi s2, s2, 1
+	j LSETUP
+
+ESETUP:	la s0, ground
+	addi s0, s0, 8
+	li t0, 144
+	mul t0, t0, a0
+	add s0, s0, t0 #endereço do tile da fase correspondente
+	la s1, tile
+	li t0, 0
+	li t1, 144
+LTILE:	beq t0, t1, ETILE
+	lw t2, 0(s0)
+	sw t2, 0(s1)
+	addi s0, s0, 4
+	addi s1, s1, 4
+	addi t0, t0, 4
+	j LTILE
+ETILE:	jalr zero, s11, 0
 	
 #função que efetivamente roda o jogo: loop por instante de tempo das ações do personagem e dos inimigos
 GAME:	li a3, 0 #frame inicial é 0
+	la s0, char
 	li a4, 3
-	sb a4, 11(s5) #direção inicial do personagem é para baixo
+	sb a4, 8(s0) #direção inicial do personagem é para baixo
 #loop do jogo
-GLOOP:	li a7, 32
-	li a0, 100 #instante de tempo: 0,1s
-	ecall
+GLOOP:	li s0, 0xFF200604 #endereço da escolha de frame
+	sw a3, 0(s0) #seleciona o frame deste instante de tempo
+	xori a3, a3, 1 #prepara próxumo frame
+	li a7, 32
+	li a0, 100 
+	ecall #instante de tempo: 0,1s
 # Resolução do personagem
-# s5: informações do personagem
-	lh a1, 0(s5) #a1: x atual
-	lh a2, 2(s5) #a2: y atual
-	lb a4, 11(s5) #a4: direção atual
+# s0: informações do personagem
+	la s0, char
+	lh a1, 0(s0) #a1: x atual
+	lh a2, 2(s0) #a2: y atual
+	lb a4, 8(s0) #a4: direção atual
 	li a5, 1
-	sh a1, 4(s5)
-	sh a2, 6(s5)
+	sh a1, 4(s0)
+	sh a2, 6(s0)
 	call INPUT # retorna a ação no a0
 	li t0, 0
 	beq a0, t0, CFIM
@@ -61,55 +136,114 @@ GLOOP:	li a7, 32
 	mv a4, a0 #nova direção
 	bne t0, a4, CFIM #muda de direção sem andar
 	call MOVE
-CFIM:	li a5, 0
-	call CHOOSE
-	sh a1, 0(s5)
-	sh a2, 2(s5)
-	sb a4, 11(s5)
-	call DRAW #desenha o personagem na posição correta
-	sw a3 0(s2) #troca os frames e mostra a imagem pronta
-	lh a1, 4(s5) #posição x antiga
-	lh a2, 6(s5) #posição y antiga
+CFIM:	sh a1, 0(s0)
+	sh a2, 2(s0)
+	sb a4, 8(s0)
 	la a0, tile
-	addi a0, a0, 8
+	call DRAW
+	li a5, 0
+	call CHOOSE
+	call DRAW #desenha o personagem na posição correta sobre o tile da fase
+	la a0, tile
 	xori a3, a3, 1 #muda os frames
 	call DRAW #apaga o rastro do personagem
+	lh a1, 4(s0) #posição x antiga
+	lh a2, 6(s0) #posição y antiga
+	call DRAW
 	xori a3, a3, 1 #volta ao frame atual
+	
 # Resolução dos inimigos
-# s6: lista de inimigos
-	lw t0, 0(s6)
-	mv t6, s6
-	addi t6, t6, 4 #t6: endereço do primeiro inimigo
-	slli t0, t0, 2
-	add t5, t6, t0 #t5: primeiro espaço sem inimigos
-ELOOP:	beq t6, t5, EFIM
-	lb t0, 8(t6) #vida atual do inimigo
-	lh a1, 0(t6)
-	lh a2, 2(t6) #posição atual do inimigo
-	lb a4, 11(t6) #direção atual do inimigo
-	lb a5, 9(t6) #id do inimigo
-	addi t6, t6, 12 #seta próxima célula de inimigo
+# s0: lista de inimigos
+	la s0, enemies
+	lw t0, 0(s0)
+	addi s0, s0, 4 #iterador da posição de inimigo
+	li t1, 6
+	mul t0, t0, t1 #espaços com inimigos
+	add s1, s0, t0 #s1: primeiro espaço sem inimigos
+ELOOP:	beq s0, s1, EFIM
+	lbu t0, 11(s0) #vida atual do inimigo
+	lh a1, 0(s0)
+	lh a2, 2(s0) #posição atual do inimigo
+	sh a1, 4(s0)
+	sh a2, 6(s0) #posição antiga do inimigo guardada
+	lb a4, 8(s0) #direção atual do inimigo
+	lb a5, 10(s0) #id do inimigo
+	addi s0, s0, 12 #seta próxima célula de inimigo
 	beq t0, zero, ELOOP #ignorar inimigos mortos
-	lh t1, 4(s5)
-	lh t2, 6(s5) #posição antiga do personagem a ser seguida
-	#cálculo: inimigos muito longe do personagem não fazem nada, 
-	#inimigos que atiram e têm o personagem na mira atiram, 
-	#inimigos melee adjacentes causam dano (creeper morre),
-	#outros ajustam direção e seguem o personagem
-	#ação: ativar flag de dano no personagem, adicionar na fila de projéteis,
-	#mover o inimigo e desenhar sua imagem e cobertura de rastro
+	addi s0, s0, -12
+	lb t0, 9(s0) #contador de ação
+	addi t0, t0, 1
+	sb t0, 9(s0) #contador++
+	li t1, 2
+	bne a5, t1, EACT #creeper ataca a cada 5 instantes de tempo
+	li t1, 6
+	blt t0, t1, EDRAW
+EACT:	li t1, 4
+	blt t0, t1, EDRAW #pode não ser a vez de agir ainda
+	sb zero, 9(s0) #zera o contador depois de decidir agir
+	la s2, char
+	lh t0, 4(s2) #old x (char)
+	lh t1, 6(s2) #old y (char)
+	sub t0, t0, a1 #dx
+	sub t1, t1, a2 #dy
+	mv t2, t0
+	mv t3, t1
+MODX:	bge t2, zero, MODY
+	li t4, -1
+	mul t2, t2, t4 # |dx|
+MODY:	bge t3, zero, MODC
+	li t4, -1
+	mul t3, t3, t4 # |dy|
+MODC:	slt t4, t2, t3 #t4 = 0: |dx| >= |dy|
+EA3:	li t2, 3
+	blt a5, t2, EA12
+	#ação enderman
+	j EMOV
+EA12:	li t2, 1
+EA12X:	beq t4, t2, EA12Y
+	slt t3, t0, zero
+	slli t3, t3, 1 #0: direita, 2: esquerda
+	li a4, 2
+	add a4, a4, t3 #a4 = 2 => direita, a4 = 4 => esquerda
+	j EMOV
+EA12Y: 	slt t3, zero, t1
+	slli t3, t3, 1 #0: cima, 2: baixo
+	li a4, 1
+	add a4, a4, t3 #1: cima, 3:baixo
+EMOV:	beq a4, zero, EDRAW #enderman pode ter atirado e não se moverá
+	sb a4, 8(s0) #salva direção
+	mv s2, a5 #guarda o id
+	mv a5, s0
+	addi a5, a5, 10 #endereço do inimigo + 10
+	call MOVE
+	sh a1, 0(s0)
+	sh a2, 2(s0) #atualiza posições
+	mv a5, s2 #recupera o id
+EDRAW:	la a0, tile
+	call DRAW 
+	call CHOOSE
+	call DRAW #desenha inimigo na nova posição
+	la a0, tile
+	xori a3, a3, 1
+	call DRAW
+	lh a1, 4(s0)
+	lh a2, 6(s0)
+	call DRAW
+	xori a3, a3, 1 #apaga o rastro do inimigo no frame anterior
+	addi s0, s0, 12
+	j ELOOP
 EFIM:	li zero, 0 #fim da resolução dos inimigos	
 # Resolução dos projéteis
 #s7: fila wrap-up de projéteis
-	lw t0, 0(s7)
+	#lw t0, 0(s7)
 # Fim do instante de tempo
-	xori a3, a3, 1 #prepara próxumo frame
+	
 	j GLOOP
 
 
 #selecionar a imagem a ser desenhada
-#a4: direção; a5: id;
-#retorna no a0 a imagem correspondente
+#a4: direção (1-4); a5: id (0-3);
+#retorna no a0 o endereço da imagem correspondente
 CHOOSE:	li t4, 144 #tamanho da imagem
 MIC0:	li t2, 0 #comparador
 	bne a5, t2, MIC1
@@ -134,7 +268,7 @@ MSI:	addi a0, a0, 8 #pula as linhas e colunas
 
 	
 #função de mover o personagem
-# a1: x atual; a2: y atual; a4: direção; a5: id;
+# a1: x atual; a2: y atual; a4: direção; a5: id(-2/-1/1/endereçamento de inimigo(+10));
 #atualizar a1 e a2 se possível
 MOVE:	li t0, 0 #dx
 	li t1, 0 #dy
@@ -168,32 +302,82 @@ MMOV:	add t3, a1, t0 #nx
 	li t2, 20
 	mul t4, t4, t2 #ny *= 20
 	mul t1, t1, t2 #dy *= 20
-	mv t5, s4
+	la t5, matrix
 	add t5, t5, t3 #posição na matrix += x
 	add t5, t5, t4 #npos += 20y
 	sub t6, t5, t0 #oldpos = pos - dx
 	sub t6, t6, t1 #oldpos -= 20dy
-	lb t2, 0(t5) #t2 = conteúdo na matriz na npos
-	bne t2, zero, MEND #só permite a movimentação em caso de espaço vazio
-	sb a5, 0(t5) #guarda o id na posição
-	sb zero, 0(t6) #a posição antiga está vazia
-	li t2, 20
-	div t4, t4, t2
-	li t2, 12
-	mul t4, t4, t2
-	mul t3, t3, t2
+	lb t0, 0(t5) #t0 = conteúdo na matriz na npos
+MIDS:	bgt a5, zero, MIDE #if is shot
+	#solve shot moving
+	j MEND
+MIDE:	li t1, 10 #if is enemy
+	blt a5, t1, MIDC
+	li t1, 3
+	bge t0, t1, MEND #obstáculo ou outro inimigo
+	beq t0, zero, MEM #move apenas para espaço vazio
+	la t0, char
+	lb t1, 10(t0)
+	bgt t1, zero, MEND #persongaem em estado de invencibilidade
+	li t1, 5
+	sb t1, 10(t0) #contador de dano = 5 (personagem invencível)
+	li t1, 2
+	addi a5, a5, -10
+	lb t2, 10(a5)
+	addi a5, a5, 10
+	bne t1, t2, MEND #caso seja um creeper quem causou dano...
+	li a7, 10
+	ecall #personagem deve morrer aqui!
+MEM:	sb zero, 0(t6)
+	sb a5, 0(t5) #atualiza posições
+	li t1, 20
+	div t4, t4, t1
+	li t1, 12
+	mul t4, t4, t1
+	mul t3, t3, t1
 	mv a1, t3
 	mv a2, t4
-	
+	j MEND
+MIDC:	beq t0, zero, MCM #if empty space proceed
+	li t1, 10
+	bge t0, t1, MEND #char cant move towards enemy
+MCC0:	li t1, 3
+	bne t0, t1, MCC1 #if key
+	la t0, char
+	li t1, 1
+	sb t1, 9(t0) #personagem tem a chave
+	j MCM #chave agora é um espaço vazio
+MCC1:	li t1, 4
+	bne t0, t1, MCC2 #if door
+	la t0, char
+	lb t1, 9(t0)
+	beq t1, zero, MEND #sem chave, a porta é como parede
+	sb zero, 0(t5) #porta agora é um espaço vazio disfarçado
+	sb zero, 9(t0) #personagem não tem mais a chave
+	j MEND
+MCC2:	li t1, 5
+	beq t0, t1, MEND #if wall return
+MCC3:	j MEND
+	#transição de fase
+MCM:	sb zero, 0(t6) #a posição antiga está vazia
+	sb a5, 0(t5) #guarda o id na posição
+	li t1, 20
+	div t4, t4, t1
+	li t1, 12
+	mul t4, t4, t1
+	mul t3, t3, t1
+	mv a1, t3
+	mv a2, t4
 MEND:	ret
 	
-#devolve a tecla pressionada no teclado, indicando a ação do personagem	
-INPUT:	#s3 = KDMMIO; a0 = código da ação do personagem (retorno)
-	lw t0, 0(s3)
+#devolve a tecla pressionada no teclado, indicando a ação do personagem
+#a0 (0-5): ação do personagem
+INPUT:	li t6, 0xFF200000 #t6 = KDMMIO;
+	lw t0, 0(t6)
 	andi t0, t0, 0x0001
 	li a0, 0
 	beq t0, zero, TECLA #sem tecla pressionada
-	lw t1, 4(s3) #lê a tecla pressionada
+	lw t1, 4(t6) #lê a tecla pressionada
 	#comparar valores ASCII e retornar código da ação
 C0:	li t2, 'w'
 	bne t1, t2, C1
@@ -217,25 +401,9 @@ C4:	li t2, 'p'
 TECLA:	ret #a0 = {0: nada, 1: cima, 2: direita,
 	    #      3: baixo, 4: esquerda, 5: tiro}
 
-#procedimento de inicializar o mapa no bitmap display para início de jogo
-DMAP:	#a0 = frame
-	li t0, 0xFF0
-	add t0, t0, a0
-	slli t0, t0, 12
-	la t2, Map
-	addi t1, t0, 0x012c
-	slli t0, t0, 8
-	slli t1, t1, 8
-MLOOP:	beq t0, t1, EL
-	lw t3, 0(t2)
-	sw t3, 0(t0)
-	addi t0, t0, 4
-	j MLOOP
-EL:	ret
-
 #função de desenho com base em uma imagem 12x12 e sua posição x, y
-DRAW:	#a0 = endereço da imagem; a1 = x; a2 = y; a3 = frame;
-	#t0 = q linhas; t1 = q colunas; t2 = contador de linha; t3 = contador de coluna; t4 = endereço do bitmap display;
+#a0 = endereço da imagem; a1 = x; a2 = y; a3 = frame;
+DRAW:	#t0 = q linhas; t1 = q colunas; t2 = contador de linha; t3 = contador de coluna; t4 = endereço do bitmap display;
 	#t5 = 320; t6 = conteúdo do pixel
 	li t0, 12
 	li t1, 12
@@ -246,14 +414,15 @@ DRAW:	#a0 = endereço da imagem; a1 = x; a2 = y; a3 = frame;
 	add t4, t4, a3
 	slli t4, t4, 20 #frame
 	add t4, t4, a1
-	mul a2, a2, t5 #endereço = endereço base + x + 320*y
-	add t4, t4, a2 #endereço de desenho
-D_ROW:	bge t2, t0, END_LOOP
+	mul t6, a2, t5 #endereço = endereço base + x + 320*y
+	add t4, t4, t6 #endereço de desenho
+	mv t5, a0
+D_ROW:	bge t2, t0, EDLOOP
 D_COL:	bge t3, t1, N_ROW
-	lw t6, 0(a0)
+	lw t6, 0(t5)
 	sw t6, 0(t4)
 	addi t4, t4, 4
-	addi a0, a0, 4
+	addi t5, t5, 4
 	addi t3, t3, 4
 	j D_COL
 N_ROW:	mv t3, zero #contador de colunas volta para zero
@@ -261,4 +430,4 @@ N_ROW:	mv t3, zero #contador de colunas volta para zero
 	addi t4, t4, 320
 	sub t4, t4, t1 #seta t4 para a próxima linha
 	j D_ROW
-END_LOOP:	ret
+EDLOOP:	ret
