@@ -1,0 +1,8 @@
+Para jogar o jogo como está no arquivo game.s:
+Estrutura de armazenamento dos arquivos: 
+Pasta p1: Pasta Sprites, Pasta p2
+Pasta Sprites: arquivos arrow, creeper, enderman, enderpearl, main e zumbi (todos .data com as quatro rotações, presentes no github)
+Pasta p1: game.s, game.data, phases.data, fpgrars-x86_64-pc-windows-gnu.exe
+Escolha de fase: na função MAIN, escolher entre a0=0 (deserto) e a0=1 (caverna) *
+* no arquivo phases.data, sintam-se livres para adicionar, retirar e mudar os tipos de inimigos em cada fase, basta mudar o código de cada célula da matriz correspondente (a primeira ou a segunda) no label phase
+Execução: abrir o terminal na pasta p2 e executar o comando "fpgrars-x86_64-pc-windows-gnu.exe game.s" (o jogo inicia imediatamente)
