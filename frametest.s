@@ -4,8 +4,8 @@
 .text
 	li s0, 0xFF000000 #endereço do frame 0
 	la s1, test #endereço da imagem
-	lw s2, 0(s1) #linhas da imagem
-	lw s3, 4(s1) #colunas da imagem
+	lw s3, 0(s1) #linhas da imagem
+	lw s2, 4(s1) #colunas da imagem
 	addi s1, s1, 8 #primeiro pixel da imagem
 	mul s4, s2, s3
 	add s4, s4, s1 #último pixel da imagem
