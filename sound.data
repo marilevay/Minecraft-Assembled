@@ -1,0 +1,5 @@
+#sound testing
+#x (número de notas) + x(<nota, duração em ms>)
+instrument: .word 127
+volume: .word 60,
+sound: .word 3, 70, 100, 70, 100, 70, 100
