@@ -1,14 +1,18 @@
 .data
-.include "game.data"
-.include "phases.data"
 .include "../Sprites/main_transparent.data"
 .include "../Sprites/enderman_transparent.data"
 .include "../Sprites/zumbi_transparent.data"
 .include "../Sprites/creeper_transparent.data"
 .include "../Sprites/arrow_transparent.data"
 .include "../Sprites/enderpearl.data"
+.include "../Sprites/logo.data"
+.include "../Sprites/hearts.data"
+.include "../Sprites/keyshow.data"
+.include "phases.data"
+.include "game.data"
 
 .text
+.include "../../MACROSv21.s"
 
 # MAIN -> SETUP
 # -> GAME -> subroutines
@@ -20,10 +24,23 @@ MAIN:	# 0xFF000000 #endereço do frame 0
 	# 0xFF200604 #endereço da escolha de frame
 	# 0xFF200000 #endereço do teclado
 	#s11 : endereço de retorno para procedimentos com múltiplas chamadas
-	li a0, 1 #fase
+	li a0, 0 #fase
+	li t0, 3
+MAINL:	beq a0, t0, MAINE
+	la t0, menu
+	lw a0, 0(t0)
+	la t1, times
+	slli t2, a0, 2
+	add t1, t1, t2 #ver o tempo para essa fase
+	lw t2, 0(t1)
+	sw t2, 8(t0)
 	call SETUP #seta a fase para jogo
 	call GAME #jogo
-	li a7, 10
+	la t0, menu
+	lw a0, 0(t0)
+	li t0, 3
+	j MAINL
+MAINE:	li a7, 10
 	ecall #fim
 
 #função de configuração das fases e do menu do jogador	
@@ -138,7 +155,8 @@ ETILE:	jalr zero, s11, 0
 	
 #função que efetivamente roda o jogo: loop por instante de tempo das ações do personagem e dos inimigos
 #a3: frame de desenho
-GAME:	li a3, 0 #frame inicial é 0
+GAME:	mv s11, ra
+	li a3, 0 #frame inicial é 0
 	la s0, char
 	li a4, 3
 	sb a4, 8(s0) #direção inicial do personagem é para baixo
@@ -152,12 +170,122 @@ GLOOP:	li s0, 0xFF200604 #endereço da escolha de frame
 	li a7, 32
 	li a0, 100 
 	ecall #instante de tempo: 0,1s
+	la s0, menu
+	lw t0, 8(s0)
+	addi t0, t0, -1
+	sw t0, 8(s0)
+	bgt t0, zero, DMENU #se tempo acabar..
+	call LOSE
+# Atualização do menu
+DMENU:	li a6, 1 #elemento desenhado é do menu
+	li a1, 0x0f0 #menu é desenhado a partir do pixel 240
+	li a2, 0
+	
+	la a0, logo
+	call DRAW
+	lw t0, 4(a0)
+	add a2, a2, t0 #pular espaço y
+	
+	la a0, hearts
+	la s0, char
+	lb t0, 11(s0)
+	li t1, 1208
+	mul t0, t0, t1
+	add a0, a0, t0
+	call DRAW
+	lw t0, 4(a0)
+	add a2, a2, t0
+	
+	li a7, 104 #serviço print str
+	mv a4, a3 #frame de impressão
+	mv s0, a3 #frame guardado
+	li a3, 0x0ff #cor de impressão: branco
+	addi a1, a1, 2
+	addi a2, a2, 2 #padding
+	mv s1, a1 #posx guardada
+	la s2, menu #informações do jogador
+	
+	la a0, strfase
+	ecall
+	lw a0, 0(s2)
+	addi a0, a0, 1 #fase atual
+	mv a1, s1
+	addi a1, a1, 42
+	li a7, 101
+	ecall #printa valor da fase atual
+	
+	addi a2, a2, 10
+	mv a1, s1
+	la a0, strscore
+	li a7, 104
+	ecall
+	mv a1, s1
+	addi a1, a1, 50
+	la a0, strclean
+	ecall
+	lw a0, 4(s2)
+	mv a1, s1
+	addi a1, a1, 50
+	mv t0, a0
+	li t1, 100
+	li t2, 10
+DML1:	bge t0, t1, DMC1
+	beq t0, zero, DMC1
+	addi a1, a1, 8
+	mul t0, t0, t2
+	j DML1
+DMC1:	li a7, 101
+	ecall #printa score atual
+	
+	addi a2, a2, 10
+	mv a1, s1
+	la a0, strtempo
+	li a7, 104
+	ecall
+	mv a1, s1
+	addi a1, a1, 50
+	la a0, strclean
+	ecall
+	lw a0, 8(s2)
+	li t2, 10
+	div a0, a0, t2
+	mv a1, s1
+	addi a1, a1, 50
+	mv t0, a0
+	li t1, 100
+DML2:	bge t0, t1, DMC2
+	beq t0, zero, DMC2
+	addi a1, a1, 8
+	mul t0, t0, t2
+	j DML2
+DMC2:	li a7, 101
+	ecall #printa tempo atual
+	
+	mv a1, s1
+	addi a1, a1, -2
+	addi a2, a2, 12 #paddding e unpadding
+	mv a3, s0 #a3 volta a conter o frame
+	
+	la a0, keyshow
+	li t0, 4808
+	slli t1, t0, 1
+	lw t2, 0(s2)
+	mul t1, t1 t2 #conjunto de sprites atual
+	add a0, a0, t1
+	la t1, char
+	lb t2, 9(t1)
+	mul t0, t0, t2
+	add a0, a0, t0 #a0 = endereço atual a ser desenhado
+	call DRAW
+	
+	
+	li a6, 0
 # Resolução do personagem
 # s0: informações do personagem
 	la s0, char
 	lb t0, 11(s0) #vida
 	bne t0, zero, CI #se morreu... #seffs perdeu a fase
-	li a7, 10
+	call LOSE
 	ecall
 CI:	lh a1, 0(s0) #a1: x atual
 	lh a2, 2(s0) #a2: y atual
@@ -358,6 +486,37 @@ SFIM:	li zero, 0
 	
 	j GLOOP
 	
+#caso do personagem perder a fase
+LOSE:	la t0, menu
+	sw zero, 4(t0)
+	call RESETC
+	
+WIN:	la t0, menu
+	la t1, char
+	lw t2, 4(t0)
+	lw t3, 8(t0)
+	li t4, 10
+	div t3, t3, t4
+	add t2, t2, t3
+	lb t3, 11(t1)
+	mul t3, t3, t4
+	add t2, t2, t3
+	sw t2, 4(t0)
+	lw t2, 0(t0)
+	addi t2, t2, 1
+	sw t2, 0(t0)
+	call RESETC
+
+RESETC:	la t0, char
+	sw zero, 0(t0)
+	sw zero, 4(t0)
+	li t1, 5
+	sb t1, 11(t0)
+	sb zero, 10(t0)
+	sb zero, 9(t0)
+	li t1, 3
+	sb t1, 8(t0)
+	jalr zero, s11, 0
 	
 #inserir uma instância de projétil na fila wrap-up
 #a1: x, a2: y, a4: dir, a5: id
@@ -486,6 +645,15 @@ MSC:	bne a5, t1, MSE
 	addi t1, t1, -1
 	sb t1, 11(t0) #morreu mas não foi apagado do mapa
 	sw zero, 0(t5) #apaga da matriz: morto no mapa
+	lb t2, 10(t0) #id do morto
+	addi t2, t2, -1
+	li t1, 10
+	mul t2, t2, t1
+	addi t2, t2, 15
+	la t1, menu
+	lw t0, 4(t1)
+	add t0, t0, t2
+	sw t0, 4(t1) #score += inimigo morto
 	j MENDS
 MSE:	li t1, 1
 	bne t0, t1, MENDS #se não for um personagem, enderpearl some
@@ -525,8 +693,7 @@ MIDE:	li t1, 10 #if is enemy
 	addi a5, a5, 10
 	li t1, 2
 	bne t1, t2, MEND #caso seja um creeper quem causou dano...
-	li a7, 10
-	ecall #personagem deve morrer aqui!
+	call LOSE
 MEM:	sw zero, 0(t6)
 	sw a5, 0(t5) #atualiza posições
 	li t1, 20
@@ -559,7 +726,8 @@ MCC1:	li t1, 4
 	j MEND
 MCC2:	li t1, 5
 	beq t0, t1, MEND #if wall return
-MCC3:	li a7, 10 #transição de fase
+MCC3:	call WIN
+	li a7, 10 #transição de fase
 	ecall
 MCM:	sw zero, 0(t6) #a posição antiga está vazia
 	sw a5, 0(t5) #guarda o id na posição
@@ -604,12 +772,16 @@ TECLA:	ret #a0 = {0: nada, 1: cima, 2: direita,
 	    #      3: baixo, 4: esquerda, 5: tiro}
 
 #função de desenho com base em uma imagem 12x12 e sua posição x, y
-#a0 = endereço da imagem; a1 = x; a2 = y; a3 = frame;
+#a0 = endereço da imagem; a1 = x; a2 = y; a3 = frame; a6 = bool de menu
 DRAW:	#t0 = q linhas; t1 = q colunas; t2 = contador de linha; t3 = contador de coluna; t4 = endereço do bitmap display;
 	#t5 = 320; t6 = conteúdo do pixel
 	li t0, 12
 	li t1, 12
-	li t2, 0 #iterador de linha
+	ble a6, zero, DST
+	lw t1, 0(a0)
+	lw t0, 4(a0)
+	addi a0, a0, 8
+DST:	li t2, 0 #iterador de linha
 	li t3, 0 #iterador de coluna
 	li t5, 320 # t5 = 320
 	li t4, 0xFF0
@@ -632,4 +804,9 @@ N_ROW:	mv t3, zero #contador de colunas volta para zero
 	addi t4, t4, 320
 	sub t4, t4, t1 #seta t4 para a próxima linha
 	j D_ROW
-EDLOOP:	ret
+EDLOOP:	ble a6, zero, RE
+	addi a0, a0, -8
+RE: 	ret
+
+
+.include "../../SYSTEMv21.s"
