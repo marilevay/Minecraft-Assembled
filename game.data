@@ -32,10 +32,6 @@ shots:	.word 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 #conteúdo: 4 halfs de posição, bytes de: vida, levou dano, possui chave e de direção.
 char:	.word 0x00000000, 0x00000000, 0x05000003,
 
-#menu: endereço das informações do menu do jogador.
-#informações: words de: fase atual, nome do jogador, tempo restante em ds.
-menu: .word 0, 0, 0,
-
 tile: .byte 137,137,137,192,137,137,137,192,137,137,137,137,
 137,137,137,137,192,137,137,137,137,137,137,137,
 137,137,137,137,137,137,137,137,137,137,137,137,
@@ -48,3 +44,11 @@ tile: .byte 137,137,137,192,137,137,137,192,137,137,137,137,
 137,137,137,192,137,137,137,137,137,192,137,137,
 137,137,137,192,137,137,192,137,137,137,137,137,
 192,137,137,192,137,192,192,137,192,137,137,137,
+
+#menu: endereço das informações do menu do jogador.
+#informações: words de: fase atual, score, tempo restante em ds.
+menu: .word 0, 0, 0,
+strfase: .string  "FASE: "
+strscore: .string "SCORE:"
+strtempo: .string "TEMPO:"
+strclean: .string "000"
