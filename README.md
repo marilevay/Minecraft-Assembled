@@ -57,7 +57,7 @@ This project is a retro-style game developed in Assembly for the Introduction to
 
 ## Authors & Credits
 
-Developed for the Introduction to Computer Systems (ISC) class, University of Brasília (UnB), Spring 2023, by Artur Botelho and Marina Levay. 
+Developed for the Introduction to Computer Systems (ISC) class, University of Brasília (UnB), Spring 2023, by Artur Botelho, Caue de Macedo and Marina Levay. 
 
 ---
 Enjoy the game and good luck!
